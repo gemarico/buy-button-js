@@ -1,5 +1,7 @@
 import Toggle from '../../../src/components/toggle';
 import View from '../../../src/view';
+import { assert } from 'chai';
+import iframe from '../../../src/iframe';
 
 describe('Toggle View class', () => {
   let toggle;
@@ -25,6 +27,8 @@ describe('Toggle View class', () => {
     let addClassStub;
     let removeClassStub;
     let resizeStub;
+    let insertAdjacentHtmlStub;
+    const summaryHtml = '<span>summary</span>';
 
     beforeEach(() => {
       superRenderStub = sinon.stub(View.prototype, 'render');
@@ -34,6 +38,11 @@ describe('Toggle View class', () => {
       toggle.view = Object.defineProperty(toggle.view, 'isVisible', {
         writable: true,
       });
+      toggle.view = Object.defineProperty(toggle.view, 'summaryHtml', {
+        writable: true,
+        value: summaryHtml,
+      });
+      insertAdjacentHtmlStub = sinon.stub(toggle.view.node, 'insertAdjacentHTML');
     });
 
     afterEach(() => {
@@ -41,6 +50,7 @@ describe('Toggle View class', () => {
       addClassStub.restore();
       removeClassStub.restore();
       resizeStub.restore();
+      insertAdjacentHtmlStub.restore();
     });
 
     it('calls super\'s render()', () => {
@@ -75,35 +85,46 @@ describe('Toggle View class', () => {
     });
 
     describe('when iframe exists', () => {
-      let setAttributeSpy;
+      let parentSetAttributeSpy;
+      let elSetAttributeSpy;
       beforeEach(() => {
-        setAttributeSpy = sinon.spy();
+        parentSetAttributeSpy = sinon.spy();
+        elSetAttributeSpy = sinon.spy();
         toggle.view.iframe = {
           parent: {
-            setAttribute: setAttributeSpy,
+            setAttribute: parentSetAttributeSpy,
           },
+          el: {
+            setAttribute: elSetAttributeSpy,
+          }
         };
         toggle.view.render();
       });
 
-      it('updates three attributes', () => {
-        assert.calledThrice(setAttributeSpy);
+      it('updates two attributes on the iframe\'s parent and one attribute on the iframe\'s el', () => {
+        assert.calledTwice(parentSetAttributeSpy);
+        assert.calledOnce(elSetAttributeSpy);
       });
 
       it('sets tabindex of iframe\'s parent to zero', () => {
-        assert.calledWith(setAttributeSpy.getCall(0), 'tabindex', 0);
+        assert.calledWith(parentSetAttributeSpy.getCall(0), 'tabindex', 0);
       });
 
       it('sets role of iframe\'s parent to button', () => {
-        assert.calledWith(setAttributeSpy.getCall(1), 'role', 'button');
+        assert.calledWith(parentSetAttributeSpy.getCall(1), 'role', 'button');
       });
 
-      it('sets aria-label of iframe\'s parent to text title', () => {
-        assert.calledWith(setAttributeSpy.getCall(2), 'aria-label', toggle.options.text.title);
+      it('sets aria-hidden to true on the iframe\'s el', () => {
+        assert.calledWith(elSetAttributeSpy.getCall(0), 'aria-hidden', true);
       });
 
       it('resizes view', () => {
         assert.calledOnce(resizeStub);
+      });
+
+      it('inserts the summaryHtml at the beginning of the node', () => {
+        assert.calledOnce(insertAdjacentHtmlStub);
+        assert.calledWith(insertAdjacentHtmlStub, 'afterbegin', summaryHtml);
       });
     });
   });
@@ -284,5 +305,55 @@ describe('Toggle View class', () => {
         assert.equal(toggle.view.readableLabel, `<p class="shopify-buy--visually-hidden">${toggle.options.text.title}</p>`);
       });
     });
+
+    describe('accessibilityLabel', () => {
+      it('returns the title wrapped in a span', () => {
+        assert.equal(toggle.view.accessibilityLabel, `<span>${toggle.options.text.title}</span>`)
+      });
+    });
+
+    describe('countAccessibilityLabel', () => {
+      it('returns an empty string if count is false in the options contents', () => {
+        toggle.config.toggle = {
+          contents: {count: false},
+          text: {countAccessibilityLabel: 'count label'},
+        };
+
+        assert.equal(toggle.view.countAccessibilityLabel, '');
+      });
+
+      it('returns the accessibililty label with the count wrapped in a span if count is true in the options contents', () => {
+        const count = 2;
+        toggle = Object.defineProperty(toggle, 'count', {
+          writable: true,
+        });
+        toggle.count = count;
+        toggle.config.toggle = {
+          contents: {count: true},
+          text: {countAccessibilityLabel: 'count label'},
+        };
+
+        assert.equal(toggle.view.countAccessibilityLabel, `<span>${toggle.options.text.countAccessibilityLabel} ${count}</span>`);
+      });
+    });
+
+    describe('summaryHtml', () => {
+      it('returns the accessibilityLabel and countAccessibilityLabel wrapped in a visually hidden span', () => {
+        const accessibilityLabel = 'accessibility label';
+        const countAccessibilityLabel = 'count accessibility label';
+
+        toggle.view = Object.defineProperty(toggle.view, 'accessibilityLabel', {
+          writable: true,
+          value: accessibilityLabel,
+        });
+        toggle.view = Object.defineProperty(toggle.view, 'countAccessibilityLabel', {
+          writable: true,
+          value: countAccessibilityLabel,
+        });
+
+        assert.equal(toggle.view.summaryHtml, `<span class="shopify-buy--visually-hidden">${accessibilityLabel}${countAccessibilityLabel}</span>`)
+      });
+    });
+
   });
 });

@@ -31,6 +31,21 @@ export default class ToggleView extends View {
     return `<p class="shopify-buy--visually-hidden">${this.component.options.text.title}</p>`;
   }
 
+  get accessibilityLabel() {
+    return `<span>${this.component.options.text.title}</span>`;
+  }
+
+  get countAccessibilityLabel() {
+    if (!this.component.options.contents.count) {
+      return '';
+    }
+    return `<span>${this.component.options.text.countAccessibilityLabel} ${this.component.count}</span>`;
+  }
+
+  get summaryHtml() {
+    return `<span class="shopify-buy--visually-hidden">${this.accessibilityLabel}${this.countAccessibilityLabel}</span>`;
+  }
+
   render() {
     super.render();
     if (this.component.options.sticky) {
@@ -44,8 +59,9 @@ export default class ToggleView extends View {
     if (this.iframe) {
       this.iframe.parent.setAttribute('tabindex', 0);
       this.iframe.parent.setAttribute('role', 'button');
-      this.iframe.parent.setAttribute('aria-label', this.component.options.text.title);
+      this.iframe.el.setAttribute('aria-hidden', true);
       this.resize();
+      this.node.insertAdjacentHTML('afterbegin', this.summaryHtml);
     }
   }
 
